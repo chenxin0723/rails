@@ -53,7 +53,7 @@ module ActionDispatch
   #     resources :posts, :comments
   #   end
   #
-  # Alternately, you can add prefixes to your path without using a separate
+  # Alternatively, you can add prefixes to your path without using a separate
   # directory by using +scope+. +scope+ takes additional options which
   # apply to all enclosed routes.
   #
@@ -237,7 +237,7 @@ module ActionDispatch
   #
   # == View a list of all your routes
   #
-  #   rake routes
+  #   rails routes
   #
   # Target specific controllers by prefixing the command with <tt>CONTROLLER=x</tt>.
   #

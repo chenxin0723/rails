@@ -1,5 +1,5 @@
 module ActiveRecord
-  # = Active Record Schema
+  # = Active Record \Schema
   #
   # Allows programmers to programmatically define a schema in a portable
   # DSL. This means you can define tables, indexes, etc. without using SQL
@@ -27,11 +27,12 @@ module ActiveRecord
   #
   # ActiveRecord::Schema is only supported by database adapters that also
   # support migrations, the two features being very similar.
-  class Schema < Migration
+  class Schema < Migration::Current
     # Eval the given block. All methods available to the current connection
     # adapter are available within the block, so you can easily use the
-    # database definition DSL to build up your schema (+create_table+,
-    # +add_index+, etc.).
+    # database definition DSL to build up your schema (
+    # {create_table}[rdoc-ref:ConnectionAdapters::SchemaStatements#create_table],
+    # {add_index}[rdoc-ref:ConnectionAdapters::SchemaStatements#add_index], etc.).
     #
     # The +info+ hash is optional, and if given is used to define metadata
     # about the current schema (currently, only the schema's version):

@@ -1,6 +1,180 @@
+*   Adds `:exception_object` key to `ActiveSupport::Notifications::Instrumenter` payload when an exception is raised.
+
+    Adds new key/value pair to payload when an exception is raised: e.g. `:exception_object => #<RuntimeError: FAIL>`.
+
+    *Ryan T. Hosford*
+
+*   Support extended grapheme clusters and UAX 29.
+
+    *Adam Roben*
+
+*   Add petabyte and exabyte numeric conversion.
+
+    *Akshay Vishnoi*
+
+## Rails 5.0.0.beta1 (December 18, 2015) ##
+
+*   Add thread_m/cattr_accessor/reader/writer suite of methods for declaring class and module variables that live per-thread.
+    This makes it easy to declare per-thread globals that are encapsulated. Note: This is a sharp edge. A wild proliferation
+    of globals is A Bad Thing. But like other sharp tools, when it's right, it's right.
+
+    Here's an example of a simple event tracking system where the object being tracked needs not pass a creator that it
+    doesn't need itself along:
+
+    module Current
+      thread_mattr_accessor :account
+      thread_mattr_accessor :user
+
+      def self.reset() self.account = self.user = nil end
+    end
+
+    class ApplicationController < ActionController::Base
+      before_action :set_current
+      after_action { Current.reset }
+
+      private
+        def set_current
+          Current.account = Account.find(params[:account_id])
+          Current.user    = Current.account.users.find(params[:user_id])
+        end
+    end
+
+    class MessagesController < ApplicationController
+      def create
+        @message = Message.create!(message_params)
+      end
+    end
+
+    class Message < ApplicationRecord
+      has_many :events
+      after_create :track_created
+
+      private
+        def track_created
+          events.create! origin: self, action: :create
+        end
+    end
+
+    class Event < ApplicationRecord
+      belongs_to :creator, class_name: 'User'
+      before_validation { self.creator ||= Current.user }
+    end
+
+    *DHH*
+
+
+*   Deprecated `Module#qualified_const_` in favour of the builtin Module#const_
+    methods.
+
+    *Genadi Samokovarov*
+
+*   Deprecate passing string to define callback.
+
+    *Yuichiro Kaneko*
+
+*   `ActiveSupport::Cache::Store#namespaced_key`,
+    `ActiveSupport::Cache::MemCachedStore#escape_key`, and
+    `ActiveSupport::Cache::FileStore#key_file_path`
+    are deprecated and replaced with `normalize_key` that now calls `super`.
+
+    `ActiveSupport::Cache::LocaleCache#set_cache_value` is deprecated and replaced with `write_cache_value`.
+
+    *Michael Grosser*
+
+*   Implements an evented file watcher to asynchronously detect changes in the
+    application source code, routes, locales, etc.
+
+    This watcher is disabled by default, applications my enable it in the configuration:
+
+        # config/environments/development.rb
+        config.file_watcher = ActiveSupport::EventedFileUpdateChecker
+
+    This feature depends on the [listen](https://github.com/guard/listen) gem:
+
+        group :development do
+          gem 'listen', '~> 3.0.5'
+        end
+
+    *Puneet Agarwal* and *Xavier Noria*
+
+*   Added `Time.days_in_year` to return the number of days in the given year, or the
+    current year if no argument is provided.
+
+    *Jon Pascoe*
+
+*   Updated `parameterize` to preserve the case of a string, optionally.
+
+    Example:
+
+        parameterize("Donald E. Knuth", separator: '_') # => "donald_e_knuth"
+        parameterize("Donald E. Knuth", preserve_case: true) # => "Donald-E-Knuth"
+
+    *Swaathi Kakarla*
+
+*   `HashWithIndifferentAccess.new` respects the default value or proc on objects
+    that respond to `#to_hash`. `.new_from_hash_copying_default` simply invokes `.new`.
+    All calls to `.new_from_hash_copying_default` are replaced with `.new`.
+
+    *Gordon Chan*
+
+*   Change Integer#year to return a Fixnum instead of a Float to improve
+    consistency.
+
+    Integer#years returned a Float while the rest of the accompanying methods
+    (days, weeks, months, etc.) return a Fixnum.
+
+    Before:
+
+    1.year # => 31557600.0
+
+    After:
+
+    1.year # => 31557600
+
+    *Konstantinos Rousis*
+
+*   Handle invalid UTF-8 strings when HTML escaping.
+
+    Use `ActiveSupport::Multibyte::Unicode.tidy_bytes` to handle invalid UTF-8
+    strings in `ERB::Util.unwrapped_html_escape` and `ERB::Util.html_escape_once`.
+    Prevents user-entered input passed from a querystring into a form field from
+    causing invalid byte sequence errors.
+
+    *Grey Baker*
+
+*   Update `ActiveSupport::Multibyte::Chars#slice!` to return `nil` if the
+    arguments are out of bounds, to mirror the behavior of `String#slice!`
+
+    *Gourav Tiwari*
+
+*   Fix `number_to_human` so that 999999999 rounds to "1 Billion" instead of
+    "1000 Million".
+
+    *Max Jacobson*
+
+*   Fix `ActiveSupport::Deprecation#deprecate_methods` to report using the
+    current deprecator instance, where applicable.
+
+    *Brandon Dunne*
+
+*   `Cache#fetch` instrumentation marks whether it was a `:hit`.
+
+    *Robin Clowers*
+
+*   `assert_difference` and `assert_no_difference` now returns the result of the
+    yielded block.
+
+    Example:
+
+      post = assert_difference -> { Post.count }, 1 do
+        Post.create
+      end
+
+    *Lucas Mazza*
+
 *   Short-circuit `blank?` on date and time values since they are never blank.
 
-    Fixes #21657
+    Fixes #21657.
 
     *Andrew White*
 
@@ -12,7 +186,7 @@
 *   Updated Unicode version to 8.0.0
 
     *Anshul Sharma*
-    
+
 *   `number_to_currency` and `number_with_delimiter` now accept custom `delimiter_pattern` option
      to handle placement of delimiter, to support currency formats like INR
 
@@ -38,7 +212,7 @@
 *   ActiveSupport::HashWithIndifferentAccess `select` and `reject` will now return
     enumerator if called without block.
 
-    Fixes #20095
+    Fixes #20095.
 
     *Bernard Potocki*
 
@@ -52,11 +226,11 @@
 
     *Simon Eskildsen*
 
-*   Fix setting `default_proc` on `HashWithIndifferentAccess#dup`
+*   Fix setting `default_proc` on `HashWithIndifferentAccess#dup`.
 
     *Simon Eskildsen*
 
-*   Fix a range of values for parameters of the Time#change
+*   Fix a range of values for parameters of the Time#change.
 
     *Nikolay Kondratyev*
 
@@ -68,7 +242,7 @@
     *Kevin Deisz*
 
 *   Add a bang version to `ActiveSupport::OrderedOptions` get methods which will raise
-    an `KeyError` if the value is `.blank?`
+    an `KeyError` if the value is `.blank?`.
 
     Before:
 
@@ -280,17 +454,14 @@
     In the past, callbacks could only be halted by explicitly providing a
     terminator and by having a callback match the conditions of the terminator.
 
-*   Add `Callbacks::CallbackChain.halt_and_display_warning_on_return_false`
+*   Add `ActiveSupport.halt_callback_chains_on_return_false`
 
-    Setting `Callbacks::CallbackChain.halt_and_display_warning_on_return_false`
+    Setting `ActiveSupport.halt_callback_chains_on_return_false`
     to `true` will let an app support the deprecated way of halting Active Record,
-    Active Model and Active Model validations callback chains by returning `false`.
+    and Active Model callback chains by returning `false`.
 
     Setting the value to `false` will tell the app to ignore any `false` value
     returned by those callbacks, and only halt the chain upon `throw(:abort)`.
-
-    The value can also be set with the Rails configuration option
-    `config.active_support.halt_callback_chains_on_return_false`.
 
     When the configuration option is missing, its value is `true`, so older apps
     ported to Rails 5.0 will not break (but display a deprecation warning).

@@ -4,9 +4,13 @@ class BaseRequestTest < ActiveSupport::TestCase
   def setup
     @env = {
       :ip_spoofing_check => true,
-      :tld_length => 1,
       "rack.input" => "foo"
     }
+    @original_tld_length = ActionDispatch::Http::URL.tld_length
+  end
+
+  def teardown
+    ActionDispatch::Http::URL.tld_length = @original_tld_length
   end
 
   def url_for(options = {})
@@ -19,9 +23,9 @@ class BaseRequestTest < ActiveSupport::TestCase
       ip_spoofing_check = env.key?(:ip_spoofing_check) ? env.delete(:ip_spoofing_check) : true
       @trusted_proxies ||= nil
       ip_app = ActionDispatch::RemoteIp.new(Proc.new { }, ip_spoofing_check, @trusted_proxies)
-      tld_length = env.key?(:tld_length) ? env.delete(:tld_length) : 1
+      ActionDispatch::Http::URL.tld_length = env.delete(:tld_length) if env.key?(:tld_length)
+
       ip_app.call(env)
-      ActionDispatch::Http::URL.tld_length = tld_length
 
       env = @env.merge(env)
       ActionDispatch::Request.new(env)
@@ -254,15 +258,6 @@ end
 
 class RequestDomain < BaseRequestTest
   test "domains" do
-    request = stub_request 'HTTP_HOST' => 'www.rubyonrails.org'
-    assert_equal "rubyonrails.org", request.domain
-
-    request = stub_request 'HTTP_HOST' => "www.rubyonrails.co.uk"
-    assert_equal "rubyonrails.co.uk", request.domain(2)
-
-    request = stub_request 'HTTP_HOST' => "www.rubyonrails.co.uk", :tld_length => 2
-    assert_equal "rubyonrails.co.uk", request.domain
-
     request = stub_request 'HTTP_HOST' => "192.168.1.200"
     assert_nil request.domain
 
@@ -271,25 +266,18 @@ class RequestDomain < BaseRequestTest
 
     request = stub_request 'HTTP_HOST' => "192.168.1.200.com"
     assert_equal "200.com", request.domain
+
+    request = stub_request 'HTTP_HOST' => 'www.rubyonrails.org'
+    assert_equal "rubyonrails.org", request.domain
+
+    request = stub_request 'HTTP_HOST' => "www.rubyonrails.co.uk"
+    assert_equal "rubyonrails.co.uk", request.domain(2)
+
+    request = stub_request 'HTTP_HOST' => "www.rubyonrails.co.uk", :tld_length => 2
+    assert_equal "rubyonrails.co.uk", request.domain
   end
 
   test "subdomains" do
-    request = stub_request 'HTTP_HOST' => "www.rubyonrails.org"
-    assert_equal %w( www ), request.subdomains
-    assert_equal "www", request.subdomain
-
-    request = stub_request 'HTTP_HOST' => "www.rubyonrails.co.uk"
-    assert_equal %w( www ), request.subdomains(2)
-    assert_equal "www", request.subdomain(2)
-
-    request = stub_request 'HTTP_HOST' => "dev.www.rubyonrails.co.uk"
-    assert_equal %w( dev www ), request.subdomains(2)
-    assert_equal "dev.www", request.subdomain(2)
-
-    request = stub_request 'HTTP_HOST' => "dev.www.rubyonrails.co.uk", :tld_length => 2
-    assert_equal %w( dev www ), request.subdomains
-    assert_equal "dev.www", request.subdomain
-
     request = stub_request 'HTTP_HOST' => "foobar.foobar.com"
     assert_equal %w( foobar ), request.subdomains
     assert_equal "foobar", request.subdomain
@@ -309,6 +297,22 @@ class RequestDomain < BaseRequestTest
     request = stub_request 'HTTP_HOST' => nil
     assert_equal [], request.subdomains
     assert_equal "", request.subdomain
+
+    request = stub_request 'HTTP_HOST' => "www.rubyonrails.org"
+    assert_equal %w( www ), request.subdomains
+    assert_equal "www", request.subdomain
+
+    request = stub_request 'HTTP_HOST' => "www.rubyonrails.co.uk"
+    assert_equal %w( www ), request.subdomains(2)
+    assert_equal "www", request.subdomain(2)
+
+    request = stub_request 'HTTP_HOST' => "dev.www.rubyonrails.co.uk"
+    assert_equal %w( dev www ), request.subdomains(2)
+    assert_equal "dev.www", request.subdomain(2)
+
+    request = stub_request 'HTTP_HOST' => "dev.www.rubyonrails.co.uk", :tld_length => 2
+    assert_equal %w( dev www ), request.subdomains
+    assert_equal "dev.www", request.subdomain
   end
 end
 
@@ -750,33 +754,33 @@ class RequestFormat < BaseRequestTest
   test "xml format" do
     request = stub_request
     assert_called(request, :parameters, times: 2, returns: {format: :xml}) do
-      assert_equal Mime::Type[:XML], request.format
+      assert_equal Mime[:xml], request.format
     end
   end
 
   test "xhtml format" do
     request = stub_request
     assert_called(request, :parameters, times: 2, returns: {format: :xhtml}) do
-      assert_equal Mime::Type[:HTML], request.format
+      assert_equal Mime[:html], request.format
     end
   end
 
   test "txt format" do
     request = stub_request
     assert_called(request, :parameters, times: 2, returns: {format: :txt}) do
-      assert_equal Mime::Type[:TEXT], request.format
+      assert_equal Mime[:text], request.format
     end
   end
 
   test "XMLHttpRequest" do
     request = stub_request(
       'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest',
-      'HTTP_ACCEPT' => [Mime::Type[:JS], Mime::Type[:HTML], Mime::Type[:XML], "text/xml", Mime::Type[:ALL]].join(",")
+      'HTTP_ACCEPT' => [Mime[:js], Mime[:html], Mime[:xml], "text/xml", "*/*"].join(",")
     )
 
     assert_called(request, :parameters, times: 1, returns: {}) do
       assert request.xhr?
-      assert_equal Mime::Type[:JS], request.format
+      assert_equal Mime[:js], request.format
     end
   end
 
@@ -796,29 +800,29 @@ class RequestFormat < BaseRequestTest
 
   test "formats text/html with accept header" do
     request = stub_request 'HTTP_ACCEPT' => 'text/html'
-    assert_equal [Mime::Type[:HTML]], request.formats
+    assert_equal [Mime[:html]], request.formats
   end
 
   test "formats blank with accept header" do
     request = stub_request 'HTTP_ACCEPT' => ''
-    assert_equal [Mime::Type[:HTML]], request.formats
+    assert_equal [Mime[:html]], request.formats
   end
 
   test "formats XMLHttpRequest with accept header" do
     request = stub_request 'HTTP_X_REQUESTED_WITH' => "XMLHttpRequest"
-    assert_equal [Mime::Type[:JS]], request.formats
+    assert_equal [Mime[:js]], request.formats
   end
 
   test "formats application/xml with accept header" do
     request = stub_request('CONTENT_TYPE' => 'application/xml; charset=UTF-8',
                            'HTTP_X_REQUESTED_WITH' => "XMLHttpRequest")
-    assert_equal [Mime::Type[:XML]], request.formats
+    assert_equal [Mime[:xml]], request.formats
   end
 
   test "formats format:text with accept header" do
     request = stub_request
     assert_called(request, :parameters, times: 2, returns: {format: :txt}) do
-      assert_equal [Mime::Type[:TEXT]], request.formats
+      assert_equal [Mime[:text]], request.formats
     end
   end
 
@@ -848,7 +852,7 @@ class RequestFormat < BaseRequestTest
   test "formats with xhr request" do
     request = stub_request 'HTTP_X_REQUESTED_WITH' => "XMLHttpRequest"
     assert_called(request, :parameters, times: 1, returns: {}) do
-      assert_equal [Mime::Type[:JS]], request.formats
+      assert_equal [Mime[:js]], request.formats
     end
   end
 
@@ -859,45 +863,66 @@ class RequestFormat < BaseRequestTest
     begin
       request = stub_request 'HTTP_ACCEPT' => 'application/xml'
       assert_called(request, :parameters, times: 1, returns: {}) do
-        assert_equal [ Mime::Type[:HTML] ], request.formats
+        assert_equal [ Mime[:html] ], request.formats
       end
 
       request = stub_request 'HTTP_ACCEPT' => 'koz-asked/something-crazy'
       assert_called(request, :parameters, times: 1, returns: {}) do
-        assert_equal [ Mime::Type[:HTML] ], request.formats
+        assert_equal [ Mime[:html] ], request.formats
       end
 
       request = stub_request 'HTTP_ACCEPT' => '*/*;q=0.1'
       assert_called(request, :parameters, times: 1, returns: {}) do
-        assert_equal [ Mime::Type[:HTML] ], request.formats
+        assert_equal [ Mime[:html] ], request.formats
       end
 
       request = stub_request 'HTTP_ACCEPT' => 'application/jxw'
       assert_called(request, :parameters, times: 1, returns: {}) do
-        assert_equal [ Mime::Type[:HTML] ], request.formats
+        assert_equal [ Mime[:html] ], request.formats
       end
 
       request = stub_request 'HTTP_ACCEPT' => 'application/xml',
                              'HTTP_X_REQUESTED_WITH' => "XMLHttpRequest"
 
       assert_called(request, :parameters, times: 1, returns: {}) do
-        assert_equal [ Mime::Type[:JS] ], request.formats
+        assert_equal [ Mime[:js] ], request.formats
       end
 
       request = stub_request 'HTTP_ACCEPT' => 'application/xml',
                              'HTTP_X_REQUESTED_WITH' => "XMLHttpRequest"
       assert_called(request, :parameters, times: 2, returns: {format: :json}) do
-        assert_equal [ Mime::Type[:JSON] ], request.formats
+        assert_equal [ Mime[:json] ], request.formats
       end
     ensure
       ActionDispatch::Request.ignore_accept_header = old_ignore_accept_header
+    end
+  end
+
+  test "format taken from the path extension" do
+    request = stub_request 'PATH_INFO' => '/foo.xml'
+    assert_called(request, :parameters, times: 1, returns: {}) do
+      assert_equal [Mime[:xml]], request.formats
+    end
+
+    request = stub_request 'PATH_INFO' => '/foo.123'
+    assert_called(request, :parameters, times: 1, returns: {}) do
+      assert_equal [Mime[:html]], request.formats
+    end
+  end
+
+  test "formats from accept headers have higher precedence than path extension" do
+    request = stub_request 'HTTP_ACCEPT' => 'application/json',
+                           'PATH_INFO' => '/foo.xml'
+
+    assert_called(request, :parameters, times: 1, returns: {}) do
+      assert_equal [Mime[:json]], request.formats
     end
   end
 end
 
 class RequestMimeType < BaseRequestTest
   test "content type" do
-    assert_equal Mime::Type[:HTML], stub_request('CONTENT_TYPE' => 'text/html').content_mime_type
+    assert_equal Mime[:html], stub_request('CONTENT_TYPE' => 'text/html').content_mime_type
   end
 
   test "no content type" do
@@ -905,11 +930,11 @@ class RequestMimeType < BaseRequestTest
   end
 
   test "content type is XML" do
-    assert_equal Mime::Type[:XML], stub_request('CONTENT_TYPE' => 'application/xml').content_mime_type
+    assert_equal Mime[:xml], stub_request('CONTENT_TYPE' => 'application/xml').content_mime_type
   end
 
   test "content type with charset" do
-    assert_equal Mime::Type[:XML], stub_request('CONTENT_TYPE' => 'application/xml; charset=UTF-8').content_mime_type
+    assert_equal Mime[:xml], stub_request('CONTENT_TYPE' => 'application/xml; charset=UTF-8').content_mime_type
   end
 
   test "user agent" do
@@ -922,9 +947,9 @@ class RequestMimeType < BaseRequestTest
       'HTTP_X_REQUESTED_WITH' => "XMLHttpRequest"
     )
 
-    assert_equal nil, request.negotiate_mime([Mime::Type[:XML], Mime::Type[:JSON]])
-    assert_equal Mime::Type[:HTML], request.negotiate_mime([Mime::Type[:XML], Mime::Type[:HTML]])
-    assert_equal Mime::Type[:HTML], request.negotiate_mime([Mime::Type[:XML], Mime::Type[:ALL]])
+    assert_equal nil, request.negotiate_mime([Mime[:xml], Mime[:json]])
+    assert_equal Mime[:html], request.negotiate_mime([Mime[:xml], Mime[:html]])
+    assert_equal Mime[:html], request.negotiate_mime([Mime[:xml], Mime::ALL])
   end
 
   test "negotiate_mime with content_type" do
@@ -933,7 +958,7 @@ class RequestMimeType < BaseRequestTest
       'HTTP_X_REQUESTED_WITH' => "XMLHttpRequest"
     )
 
-    assert_equal Mime::Type[:XML], request.negotiate_mime([Mime::Type[:XML], Mime::Type[:CSV]])
+    assert_equal Mime[:xml], request.negotiate_mime([Mime[:xml], Mime[:csv]])
   end
 end
 
@@ -961,15 +986,33 @@ class RequestParameters < BaseRequestTest
     end
   end
 
+  test "path parameters with invalid UTF8 encoding" do
+    request = stub_request(
+      "action_dispatch.request.path_parameters" => { foo: "\xBE" }
+    )
+
+    err = assert_raises(ActionController::BadRequest) do
+      request.check_path_parameters!
+    end
+
+    assert_match "Invalid parameter encoding", err.message
+    assert_match "foo", err.message
+    assert_match "\\xBE", err.message
+  end
+
   test "parameters not accessible after rack parse error of invalid UTF8 character" do
     request = stub_request("QUERY_STRING" => "foo%81E=1")
+    assert_raises(ActionController::BadRequest) { request.parameters }
+  end
 
-    2.times do
-      assert_raises(ActionController::BadRequest) do
-        # rack will raise a Rack::Utils::InvalidParameterError when parsing this query string
-        request.parameters
-      end
-    end
+  test "parameters containing an invalid UTF8 character" do
+    request = stub_request("QUERY_STRING" => "foo=%81E")
+    assert_raises(ActionController::BadRequest) { request.parameters }
+  end
+
+  test "parameters containing a deeply nested invalid UTF8 character" do
+    request = stub_request("QUERY_STRING" => "foo[bar]=%81E")
+    assert_raises(ActionController::BadRequest) { request.parameters }
   end
 
   test "parameters not accessible after rack parse error 1" do
@@ -994,8 +1037,8 @@ class RequestParameters < BaseRequestTest
       request.parameters
     end
 
-    assert e.original_exception
-    assert_equal e.original_exception.backtrace, e.backtrace
+    assert_not_nil e.cause
+    assert_equal e.cause.backtrace, e.backtrace
   end
 end
 
@@ -1192,5 +1235,25 @@ class RequestVariant < BaseRequestTest
     assert_raise ArgumentError do
       @request.variant = [:phone, 'tablet']
     end
+  end
+end
+
+class RequestFormData < BaseRequestTest
+  test 'media_type is from the FORM_DATA_MEDIA_TYPES array' do
+    assert stub_request('CONTENT_TYPE' => 'application/x-www-form-urlencoded').form_data?
+    assert stub_request('CONTENT_TYPE' => 'multipart/form-data').form_data?
+  end
+
+  test 'media_type is not from the FORM_DATA_MEDIA_TYPES array' do
+    assert !stub_request('CONTENT_TYPE' => 'application/xml').form_data?
+    assert !stub_request('CONTENT_TYPE' => 'multipart/related').form_data?
+  end
+
+  test 'no Content-Type header is provided and the request_method is POST' do
+    request = stub_request('REQUEST_METHOD' => 'POST')
+
+    assert_equal '', request.media_type
+    assert_equal 'POST', request.request_method
+    assert !request.form_data?
   end
 end

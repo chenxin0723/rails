@@ -26,6 +26,10 @@ module ActiveModel
   #
   #     define_attribute_methods :name
   #
+  #     def initialize(name)
+  #       @name = name
+  #     end
+  #
   #     def name
   #       @name
   #     end
@@ -54,7 +58,7 @@ module ActiveModel
   #
   # A newly instantiated +Person+ object is unchanged:
   #
-  #   person = Person.new
+  #   person = Person.new("Uncle Bob")
   #   person.changed? # => false
   #
   # Change the name:
@@ -203,7 +207,7 @@ module ActiveModel
       # Returns +true+ if attr_name were changed before the model was saved,
       # +false+ otherwise.
       def previous_changes_include?(attr_name)
-        @previously_changed.include?(attr_name)
+        previous_changes.include?(attr_name)
       end
 
       # Removes current changes and makes them accessible through +previous_changes+.
@@ -225,7 +229,7 @@ module ActiveModel
 
       # Handles <tt>*_previous_change</tt> for +method_missing+.
       def attribute_previous_change(attr)
-        @previously_changed[attr] if attribute_previously_changed?(attr)
+        previous_changes[attr] if attribute_previously_changed?(attr)
       end
 
       # Handles <tt>*_will_change!</tt> for +method_missing+.

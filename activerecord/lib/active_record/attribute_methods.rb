@@ -1,7 +1,7 @@
 require 'active_support/core_ext/enumerable'
 require 'active_support/core_ext/string/filters'
 require 'mutex_m'
-require 'concurrent'
+require 'concurrent/map'
 
 module ActiveRecord
   # = Active Record Attribute Methods
@@ -96,7 +96,7 @@ module ActiveRecord
         end
       end
 
-      # Raises a <tt>ActiveRecord::DangerousAttributeError</tt> exception when an
+      # Raises an ActiveRecord::DangerousAttributeError exception when an
       # \Active \Record method is defined in the model, otherwise +false+.
       #
       #   class Person < ActiveRecord::Base
@@ -106,7 +106,7 @@ module ActiveRecord
       #   end
       #
       #   Person.instance_method_already_implemented?(:save)
-      #   # => ActiveRecord::DangerousAttributeError: save is defined by ActiveRecord
+      #   # => ActiveRecord::DangerousAttributeError: save is defined by Active Record. Check to make sure that you don't have an attribute or method with the same name.
       #
       #   Person.instance_method_already_implemented?(:name)
       #   # => false
@@ -189,6 +189,18 @@ module ActiveRecord
           else
             []
           end
+      end
+
+      # Returns true if the given attribute exists, otherwise false.
+      #
+      #   class Person < ActiveRecord::Base
+      #   end
+      #
+      #   Person.has_attribute?('name')   # => true
+      #   Person.has_attribute?(:age)     # => true
+      #   Person.has_attribute?(:nothing) # => false
+      def has_attribute?(attr_name)
+        attribute_types.key?(attr_name.to_s)
       end
 
       # Returns the column object for the named attribute.
@@ -346,7 +358,7 @@ module ActiveRecord
     #
     # Note: +:id+ is always present.
     #
-    # Alias for the <tt>read_attribute</tt> method.
+    # Alias for the #read_attribute method.
     #
     #   class Person < ActiveRecord::Base
     #     belongs_to :organization
@@ -364,7 +376,7 @@ module ActiveRecord
     end
 
     # Updates the attribute identified by <tt>attr_name</tt> with the specified +value+.
-    # (Alias for the protected <tt>write_attribute</tt> method).
+    # (Alias for the protected #write_attribute method).
     #
     #   class Person < ActiveRecord::Base
     #   end

@@ -2,7 +2,7 @@ ActiveRecord::Schema.define do
   create_table :binary_fields, force: true do |t|
     t.binary :var_binary, limit: 255
     t.binary :var_binary_large, limit: 4095
-    t.column :tiny_blob, 'tinyblob', limit: 255
+    t.blob   :tiny_blob, limit: 255
     t.binary :normal_blob, limit: 65535
     t.binary :medium_blob, limit: 16777215
     t.binary :long_blob, limit: 2147483647
@@ -40,11 +40,22 @@ BEGIN
 END
 SQL
 
+  ActiveRecord::Base.connection.execute <<-SQL
+DROP PROCEDURE IF EXISTS topics;
+SQL
+
+  ActiveRecord::Base.connection.execute <<-SQL
+CREATE PROCEDURE topics(IN num INT) SQL SECURITY INVOKER
+BEGIN
+  select * from topics limit num;
+END
+SQL
+
   ActiveRecord::Base.connection.drop_table "enum_tests", if_exists: true
 
   ActiveRecord::Base.connection.execute <<-SQL
 CREATE TABLE enum_tests (
-  enum_column ENUM('text','blob','tiny','medium','long')
+  enum_column ENUM('text','blob','tiny','medium','long','unsigned')
 )
 SQL
 end

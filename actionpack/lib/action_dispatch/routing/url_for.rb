@@ -1,7 +1,7 @@
 module ActionDispatch
   module Routing
     # In <tt>config/routes.rb</tt> you define URL-to-controller mappings, but the reverse
-    # is also possible: an URL can be generated from one of your routing definitions.
+    # is also possible: a URL can be generated from one of your routing definitions.
     # URL generation functionality is centralized in this module.
     #
     # See ActionDispatch::Routing for general information about routing and routes.rb.
@@ -172,8 +172,11 @@ module ActionDispatch
           _routes.url_for(options.symbolize_keys.reverse_merge!(url_options),
                          route_name)
         when ActionController::Parameters
+          unless options.permitted?
+            raise ArgumentError.new("Generating an URL from non sanitized request parameters is insecure!")
+          end
           route_name = options.delete :use_route
-          _routes.url_for(options.to_unsafe_h.symbolize_keys.
+          _routes.url_for(options.to_h.symbolize_keys.
                           reverse_merge!(url_options), route_name)
         when String
           options

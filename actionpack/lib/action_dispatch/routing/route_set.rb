@@ -1,5 +1,4 @@
 require 'action_dispatch/journey'
-require 'forwardable'
 require 'active_support/concern'
 require 'active_support/core_ext/object/to_query'
 require 'active_support/core_ext/hash/slice'
@@ -31,9 +30,9 @@ module ActionDispatch
           controller = controller req
           res        = controller.make_response! req
           dispatch(controller, params[:action], req, res)
-        rescue NameError => e
+        rescue ActionController::RoutingError
           if @raise_on_name_error
-            raise ActionController::RoutingError, e.message, e.backtrace
+            raise
           else
             return [404, {'X-Cascade' => 'pass'}, []]
           end
@@ -43,6 +42,8 @@ module ActionDispatch
 
         def controller(req)
           req.controller_class
+        rescue NameError => e
+          raise ActionController::RoutingError, e.message, e.backtrace
         end
 
         def dispatch(controller, action, req, res)
@@ -372,10 +373,6 @@ module ActionDispatch
       end
 
       def eval_block(block)
-        if block.arity == 1
-          raise "You are using the old router DSL which has been removed in Rails 3.1. " <<
-            "Please check how to update your routes file at: http://www.engineyard.com/blog/2010/the-lowdown-on-routes-in-rails-3/"
-        end
         mapper = Mapper.new(self)
         if default_scope
           mapper.with_default_scope(default_scope, &block)
@@ -656,14 +653,18 @@ module ActionDispatch
 
       RESERVED_OPTIONS = [:host, :protocol, :port, :subdomain, :domain, :tld_length,
                           :trailing_slash, :anchor, :params, :only_path, :script_name,
-                          :original_script_name]
+                          :original_script_name, :relative_url_root]
 
       def optimize_routes_generation?
         default_url_options.empty?
       end
 
       def find_script_name(options)
-        options.delete(:script_name) || relative_url_root || ''
+        options.delete(:script_name) || find_relative_url_root(options) || ''
+      end
+
+      def find_relative_url_root(options)
+        options.delete(:relative_url_root) || relative_url_root
       end
 
       def path_for(options, route_name = nil)

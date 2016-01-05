@@ -29,7 +29,17 @@ module ActiveRecord
       # Returns an ActiveRecord::Result instance.
       def select_all(arel, name = nil, binds = [])
         arel, binds = binds_from_relation arel, binds
-        select(to_sql(arel, binds), name, binds)
+        sql = to_sql(arel, binds)
+        if arel.is_a?(String)
+          preparable = false
+        else
+          preparable = visitor.preparable
+        end
+        if prepared_statements && preparable
+          select_prepared(sql, name, binds)
+        else
+          select(sql, name, binds)
+        end
       end
 
       # Returns a record hash with the column names as keys and column values
@@ -67,7 +77,7 @@ module ActiveRecord
       # Executes +sql+ statement in the context of this connection using
       # +binds+ as the bind substitutes. +name+ is logged along with
       # the executed +sql+ statement.
-      def exec_query(sql, name = 'SQL', binds = [])
+      def exec_query(sql, name = 'SQL', binds = [], prepare: false)
       end
 
       # Executes insert +sql+ statement in the context of this connection using
@@ -192,13 +202,13 @@ module ActiveRecord
       # * http://www.postgresql.org/docs/current/static/transaction-iso.html
       # * https://dev.mysql.com/doc/refman/5.7/en/set-transaction.html
       #
-      # An <tt>ActiveRecord::TransactionIsolationError</tt> will be raised if:
+      # An ActiveRecord::TransactionIsolationError will be raised if:
       #
       # * The adapter does not support setting the isolation level
       # * You are joining an existing open transaction
       # * You are creating a nested (savepoint) transaction
       #
-      # The mysql, mysql2 and postgresql adapters support setting the transaction
+      # The mysql2 and postgresql adapters support setting the transaction
       # isolation level. However, support is disabled for MySQL versions below 5,
       # because they are affected by a bug[http://bugs.mysql.com/bug.php?id=39170]
       # which means the isolation level gets persisted outside the transaction.
@@ -334,18 +344,12 @@ module ActiveRecord
       # The default strategy for an UPDATE with joins is to use a subquery. This doesn't work
       # on MySQL (even when aliasing the tables), but MySQL allows using JOIN directly in
       # an UPDATE statement, so in the MySQL adapters we redefine this to do that.
-      def join_to_update(update, select) #:nodoc:
-        key = update.key
+      def join_to_update(update, select, key) # :nodoc:
         subselect = subquery_for(key, select)
 
         update.where key.in(subselect)
       end
-
-      def join_to_delete(delete, select, key) #:nodoc:
-        subselect = subquery_for(key, select)
-
-        delete.where key.in(subselect)
-      end
+      alias join_to_delete join_to_update
 
       protected
 
@@ -358,9 +362,12 @@ module ActiveRecord
 
         # Returns an ActiveRecord::Result instance.
         def select(sql, name = nil, binds = [])
-          exec_query(sql, name, binds)
+          exec_query(sql, name, binds, prepare: false)
         end
 
+        def select_prepared(sql, name = nil, binds = [])
+          exec_query(sql, name, binds, prepare: true)
+        end
 
         # Returns the last auto-generated ID from the affected table.
         def insert_sql(sql, name = nil, pk = nil, id_value = nil, sequence_name = nil)

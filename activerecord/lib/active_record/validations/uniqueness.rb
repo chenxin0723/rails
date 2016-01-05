@@ -73,15 +73,18 @@ module ActiveRecord
           value = value.to_s[0, column.limit]
         end
 
-        value = Arel::Nodes::Quoted.new(value)
-
         comparison = if !options[:case_sensitive] && !value.nil?
           # will use SQL LOWER function before comparison, unless it detects a case insensitive collation
           klass.connection.case_insensitive_comparison(table, attribute, column, value)
         else
           klass.connection.case_sensitive_comparison(table, attribute, column, value)
         end
-        klass.unscoped.where(comparison)
+        if value.nil?
+          klass.unscoped.where(comparison)
+        else
+          bind = Relation::QueryAttribute.new(attribute.to_s, value, Type::Value.new)
+          klass.unscoped.where(comparison, bind)
+        end
       rescue RangeError
         klass.none
       end
@@ -172,7 +175,8 @@ module ActiveRecord
       #
       # === Concurrency and integrity
       #
-      # Using this validation method in conjunction with ActiveRecord::Base#save
+      # Using this validation method in conjunction with
+      # {ActiveRecord::Base#save}[rdoc-ref:Persistence#save]
       # does not guarantee the absence of duplicate record insertions, because
       # uniqueness checks on the application level are inherently prone to race
       # conditions. For example, suppose that two users try to post a Comment at
@@ -209,12 +213,12 @@ module ActiveRecord
       # This could even happen if you use transactions with the 'serializable'
       # isolation level. The best way to work around this problem is to add a unique
       # index to the database table using
-      # ActiveRecord::ConnectionAdapters::SchemaStatements#add_index. In the
-      # rare case that a race condition occurs, the database will guarantee
+      # {connection.add_index}[rdoc-ref:ConnectionAdapters::SchemaStatements#add_index].
+      # In the rare case that a race condition occurs, the database will guarantee
       # the field's uniqueness.
       #
       # When the database catches such a duplicate insertion,
-      # ActiveRecord::Base#save will raise an ActiveRecord::StatementInvalid
+      # {ActiveRecord::Base#save}[rdoc-ref:Persistence#save] will raise an ActiveRecord::StatementInvalid
       # exception. You can either choose to let this error propagate (which
       # will result in the default Rails exception page being shown), or you
       # can catch it and restart the transaction (e.g. by telling the user
@@ -230,7 +234,6 @@ module ActiveRecord
       #
       # The following bundled adapters throw the ActiveRecord::RecordNotUnique exception:
       #
-      # * ActiveRecord::ConnectionAdapters::MysqlAdapter.
       # * ActiveRecord::ConnectionAdapters::Mysql2Adapter.
       # * ActiveRecord::ConnectionAdapters::SQLite3Adapter.
       # * ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.

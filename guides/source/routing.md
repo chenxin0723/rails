@@ -79,7 +79,7 @@ it asks the router to map it to a controller action. If the first matching route
 resources :photos
 ```
 
-Rails would dispatch that request to the `destroy` method on the `photos` controller with `{ id: '17' }` in `params`.
+Rails would dispatch that request to the `destroy` action on the `photos` controller with `{ id: '17' }` in `params`.
 
 ### CRUD, Verbs, and Actions
 
@@ -142,10 +142,10 @@ Sometimes, you have a resource that clients always look up without referencing a
 get 'profile', to: 'users#show'
 ```
 
-Passing a `String` to `get` will expect a `controller#action` format, while passing a `Symbol` will map directly to an action:
+Passing a `String` to `get` will expect a `controller#action` format, while passing a `Symbol` will map directly to an action but you must also specify the `controller:` to use:
 
 ```ruby
-get 'profile', to: :show
+get 'profile', to: :show, controller: 'users'
 ```
 
 This resourceful route:
@@ -252,11 +252,11 @@ TIP: _If you need to use a different controller namespace inside a `namespace` b
 It's common to have resources that are logically children of other resources. For example, suppose your application includes these models:
 
 ```ruby
-class Magazine < ActiveRecord::Base
+class Magazine < ApplicationRecord
   has_many :ads
 end
 
-class Ad < ActiveRecord::Base
+class Ad < ApplicationRecord
   belongs_to :magazine
 end
 ```
@@ -392,7 +392,7 @@ The comments resource here will have the following routes generated for it:
 
 ### Routing concerns
 
-Routing Concerns allows you to declare common routes that can be reused inside other resources and routes. To define a concern:
+Routing concerns allow you to declare common routes that can be reused inside other resources and routes. To define a concern:
 
 ```ruby
 concern :commentable do
@@ -1096,10 +1096,10 @@ Video.find_by(identifier: params[:identifier])
 ```
 
 You can override `ActiveRecord::Base#to_param` of a related model to construct
-an URL:
+a URL:
 
 ```ruby
-class Video < ActiveRecord::Base
+class Video < ApplicationRecord
   def to_param
     identifier
   end

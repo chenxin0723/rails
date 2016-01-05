@@ -75,7 +75,7 @@ module Rails
 
         in_root do
           if block
-            append_file "Gemfile", "source #{quote(source)} do", force: true
+            append_file "Gemfile", "\nsource #{quote(source)} do", force: true
             @in_group = true
             instance_eval(&block)
             @in_group = false
@@ -235,7 +235,7 @@ module Rails
         sentinel = /\.routes\.draw do\s*\n/m
 
         in_root do
-          inject_into_file 'config/routes.rb', "  #{routing_code}\n", { after: sentinel, verbose: false, force: true }
+          inject_into_file 'config/routes.rb', "  #{routing_code}\n", { after: sentinel, verbose: false, force: false }
         end
       end
 

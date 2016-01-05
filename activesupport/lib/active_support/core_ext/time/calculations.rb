@@ -16,14 +16,20 @@ class Time
       super || (self == Time && other.is_a?(ActiveSupport::TimeWithZone))
     end
 
-    # Return the number of days in the given month.
+    # Returns the number of days in the given month.
     # If no year is specified, it will use the current year.
-    def days_in_month(month, year = now.year)
+    def days_in_month(month, year = current.year)
       if month == 2 && ::Date.gregorian_leap?(year)
         29
       else
         COMMON_YEAR_DAYS_IN_MONTH[month]
       end
+    end
+
+    # Returns the number of days in the given year.
+    # If no year is specified, it will use the current year.
+    def days_in_year(year = current.year)
+      days_in_month(2, year) + 337
     end
 
     # Returns <tt>Time.zone.now</tt> when <tt>Time.zone</tt> or <tt>config.time_zone</tt> are set, otherwise just returns <tt>Time.now</tt>.
@@ -51,9 +57,9 @@ class Time
 
   # Returns the number of seconds since 00:00:00.
   #
-  #   Time.new(2012, 8, 29,  0,  0,  0).seconds_since_midnight # => 0
-  #   Time.new(2012, 8, 29, 12, 34, 56).seconds_since_midnight # => 45296
-  #   Time.new(2012, 8, 29, 23, 59, 59).seconds_since_midnight # => 86399
+  #   Time.new(2012, 8, 29,  0,  0,  0).seconds_since_midnight # => 0.0
+  #   Time.new(2012, 8, 29, 12, 34, 56).seconds_since_midnight # => 45296.0
+  #   Time.new(2012, 8, 29, 23, 59, 59).seconds_since_midnight # => 86399.0
   def seconds_since_midnight
     to_i - change(:hour => 0).to_i + (usec / 1.0e+6)
   end
@@ -156,7 +162,6 @@ class Time
 
   # Returns a new Time representing the start of the day (0:00)
   def beginning_of_day
-    #(self - seconds_since_midnight).change(usec: 0)
     change(:hour => 0)
   end
   alias :midnight :beginning_of_day

@@ -82,7 +82,7 @@ module ActionDispatch
         end
         assert_equal({:omg=>:awesome, :controller=>"posts", :action=>"index"},
                      fakeset.defaults.first)
-        assert_equal(/^GET$/, fakeset.routes.first.verb)
+        assert_equal("GET", fakeset.routes.first.verb)
       end
 
       def test_mapping_requirements
@@ -99,7 +99,7 @@ module ActionDispatch
         mapper.scope(via: :put) do
           mapper.match '/', :to => 'posts#index', :as => :main
         end
-        assert_equal(/^PUT$/, fakeset.routes.first.verb)
+        assert_equal("PUT", fakeset.routes.first.verb)
       end
 
       def test_map_slash
@@ -158,12 +158,24 @@ module ActionDispatch
         assert_equal '/*path.:format', fakeset.asts.first.to_s
       end
 
-      def test_raising_helpful_error_on_invalid_arguments
+      def test_raising_error_when_path_is_not_passed
         fakeset = FakeSet.new
         mapper = Mapper.new fakeset
         app = lambda { |env| [200, {}, [""]] }
         assert_raises ArgumentError do
           mapper.mount app
+        end
+      end
+
+      def test_raising_error_when_rack_app_is_not_passed
+        fakeset = FakeSet.new
+        mapper = Mapper.new fakeset
+        assert_raises ArgumentError do
+          mapper.mount 10, as: "exciting"
+        end
+
+        assert_raises ArgumentError do
+          mapper.mount as: "exciting"
         end
       end
     end

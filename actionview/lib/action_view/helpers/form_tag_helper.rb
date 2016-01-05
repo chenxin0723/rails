@@ -20,7 +20,7 @@ module ActionView
       mattr_accessor :embed_authenticity_token_in_remote_forms
       self.embed_authenticity_token_in_remote_forms = false
 
-      # Starts a form tag that points the action to an url configured with <tt>url_for_options</tt> just like
+      # Starts a form tag that points the action to a url configured with <tt>url_for_options</tt> just like
       # ActionController::Base#url_for. The method for the form defaults to POST.
       #
       # ==== Options
@@ -447,12 +447,12 @@ module ActionView
           unless tag_options["data-disable-with"] == false || (tag_options["data"] && tag_options["data"][:disable_with] == false)
             disable_with_text = tag_options["data-disable-with"]
             disable_with_text ||= tag_options["data"][:disable_with] if tag_options["data"]
-            disable_with_text ||= value.clone
+            disable_with_text ||= value.to_s.clone
             tag_options.deep_merge!("data" => { "disable_with" => disable_with_text })
           else
-            tag_options.delete("data-disable-with")
             tag_options["data"].delete(:disable_with) if tag_options["data"]
           end
+          tag_options.delete("data-disable-with")
         end
 
         tag :input, tag_options

@@ -18,6 +18,7 @@ require 'models/minivan'
 require 'models/aircraft'
 require "models/possession"
 require "models/reader"
+require "models/categorization"
 
 class RelationTest < ActiveRecord::TestCase
   fixtures :authors, :topics, :entrants, :developers, :companies, :developers_projects, :accounts, :categories, :categorizations, :posts, :comments,
@@ -110,13 +111,36 @@ class RelationTest < ActiveRecord::TestCase
 
   def test_loaded_first
     topics = Topic.all.order('id ASC')
+    topics.to_a # force load
 
-    assert_queries(1) do
-      topics.to_a # force load
-      2.times { assert_equal "The First Topic", topics.first.title }
+    assert_no_queries do
+      assert_equal "The First Topic", topics.first.title
     end
 
     assert topics.loaded?
+  end
+
+  def test_loaded_first_with_limit
+    topics = Topic.all.order('id ASC')
+    topics.to_a # force load
+
+    assert_no_queries do
+      assert_equal ["The First Topic",
+                    "The Second Topic of the day"], topics.first(2).map(&:title)
+    end
+
+    assert topics.loaded?
+  end
+
+  def test_first_get_more_than_available
+    topics = Topic.all.order('id ASC')
+    unloaded_first = topics.first(10)
+    topics.to_a # force load
+
+    assert_no_queries do
+      loaded_first = topics.first(10)
+      assert_equal unloaded_first, loaded_first
+    end
   end
 
   def test_reload
@@ -295,6 +319,11 @@ class RelationTest < ActiveRecord::TestCase
   def test_finding_with_complex_order
     tags = Tag.includes(:taggings).references(:taggings).order("REPLACE('abc', taggings.taggable_type, taggings.taggable_type)").to_a
     assert_equal 3, tags.length
+  end
+
+  def test_finding_with_sanitized_order
+    query = Tag.order(["field(id, ?)", [1,3,2]]).to_sql
+    assert_match(/field\(id, 1,3,2\)/, query)
   end
 
   def test_finding_with_order_limit_and_offset
@@ -911,6 +940,12 @@ class RelationTest < ActiveRecord::TestCase
     post = authors(:david).posts.first
     authors = Author.includes(:posts).where(name: "David", posts: { id: post.id })
     assert authors.exists?(authors(:david).id)
+  end
+
+  def test_any_with_scope_on_hash_includes
+    post = authors(:david).posts.first
+    categories = Categorization.includes(author: :posts).where(posts: { id: post.id })
+    assert categories.exists?
   end
 
   def test_last
@@ -1539,6 +1574,13 @@ class RelationTest < ActiveRecord::TestCase
     # Testing that the before_update callbacks have run
     assert_equal 'David', topic1.reload.author_name
     assert_equal 'David', topic2.reload.author_name
+  end
+
+  def test_update_on_relation_passing_active_record_object_is_deprecated
+    topic = Topic.create!(title: 'Foo', author_name: nil)
+    assert_deprecated(/update/) do
+      Topic.where(id: topic.id).update(topic, title: 'Bar')
+    end
   end
 
   def test_distinct

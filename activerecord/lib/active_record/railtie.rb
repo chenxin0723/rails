@@ -121,7 +121,7 @@ module ActiveRecord
 
     # This sets the database configuration from Configuration#database_configuration
     # and then establishes the connection.
-    initializer "active_record.initialize_database" do |app|
+    initializer "active_record.initialize_database" do
       ActiveSupport.on_load(:active_record) do
         self.configurations = Rails.application.config.database_configuration
 
@@ -134,8 +134,8 @@ Oops - You have a database configured, but it doesn't exist yet!
 Here's how to get started:
 
   1. Configure your database in config/database.yml.
-  2. Run `bin/rake db:create` to create the database.
-  3. Run `bin/rake db:setup` to load your database schema.
+  2. Run `bin/rails db:create` to create the database.
+  3. Run `bin/rails db:setup` to load your database schema.
 end_warning
           raise
         end

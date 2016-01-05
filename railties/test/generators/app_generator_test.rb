@@ -151,6 +151,12 @@ class AppGeneratorTest < Rails::Generators::TestCase
     assert_file("config/initializers/cookies_serializer.rb", /Rails\.application\.config\.action_dispatch\.cookies_serializer = :json/)
   end
 
+  def test_new_application_not_include_api_initializers
+    run_generator
+
+    assert_no_file 'config/initializers/cors.rb'
+  end
+
   def test_rails_update_keep_the_cookie_serializer_if_it_is_already_configured
     app_root = File.join(destination_root, 'myapp')
     run_generator [app_root]
@@ -264,7 +270,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
     if defined?(JRUBY_VERSION)
       assert_gem "activerecord-jdbcmysql-adapter"
     else
-      assert_gem "mysql2"
+      assert_gem "mysql2", "'>= 0.3.18', '< 0.5'"
     end
   end
 
@@ -279,7 +285,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
     if defined?(JRUBY_VERSION)
       assert_gem "activerecord-jdbcpostgresql-adapter"
     else
-      assert_gem "pg"
+      assert_gem "pg", "'~> 0.18'"
     end
   end
 
@@ -334,6 +340,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
     run_generator [destination_root, "--skip-active-record"]
     assert_no_file "config/database.yml"
     assert_no_file "config/initializers/active_record_belongs_to_required_by_default.rb"
+    assert_no_file "app/models/application_record.rb"
     assert_file "config/application.rb", /#\s+require\s+["']active_record\/railtie["']/
     assert_file "test/test_helper.rb" do |helper_content|
       assert_no_match(/fixtures :all/, helper_content)
@@ -352,6 +359,13 @@ class AppGeneratorTest < Rails::Generators::TestCase
     assert_file "config/environments/production.rb" do |content|
       assert_no_match(/config\.action_mailer/, content)
     end
+  end
+
+  def test_generator_has_assets_gems
+    run_generator
+
+    assert_gem 'sass-rails'
+    assert_gem 'uglifier'
   end
 
   def test_generator_if_skip_sprockets_is_given
@@ -373,6 +387,14 @@ class AppGeneratorTest < Rails::Generators::TestCase
       assert_no_match(/config\.assets\.js_compressor = :uglifier/, content)
       assert_no_match(/config\.assets\.css_compressor = :sass/, content)
     end
+  end
+
+  def test_generator_if_skip_action_cable_is_given
+    run_generator [destination_root, "--skip-action-cable"]
+    assert_file "config/application.rb", /#\s+require\s+["']action_cable\/engine["']/
+    assert_no_file "config/redis/cable.yml"
+    assert_no_file "app/assets/javascripts/cable.coffee"
+    assert_no_file "app/channels"
   end
 
   def test_inclusion_of_javascript_runtime
@@ -505,7 +527,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
 
     assert_file "Gemfile" do |content|
       assert_match(/gem 'web-console',\s+github: 'rails\/web-console'/, content)
-      assert_no_match(/gem 'web-console', '~> 2.0'/, content)
+      assert_no_match(/gem 'web-console', '~> 3.0'/, content)
     end
   end
 
@@ -514,7 +536,7 @@ class AppGeneratorTest < Rails::Generators::TestCase
 
     assert_file "Gemfile" do |content|
       assert_match(/gem 'web-console',\s+github: 'rails\/web-console'/, content)
-      assert_no_match(/gem 'web-console', '~> 2.0'/, content)
+      assert_no_match(/gem 'web-console', '~> 3.0'/, content)
     end
   end
 
@@ -611,8 +633,6 @@ class AppGeneratorTest < Rails::Generators::TestCase
     run_generator
     folders_with_keep = %w(
       app/assets/images
-      app/mailers
-      app/models
       app/controllers/concerns
       app/models/concerns
       lib/tasks
@@ -686,7 +706,11 @@ class AppGeneratorTest < Rails::Generators::TestCase
     capture(:stdout) { generator.send(*args, &block) }
   end
 
-  def assert_gem(gem)
-    assert_file "Gemfile", /^\s*gem\s+["']#{gem}["']$*/
+  def assert_gem(gem, constraint = nil)
+    if constraint
+      assert_file "Gemfile", /^\s*gem\s+["']#{gem}["'], #{constraint}$*/
+    else
+      assert_file "Gemfile", /^\s*gem\s+["']#{gem}["']$*/
+    end
   end
 end

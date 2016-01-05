@@ -7,8 +7,10 @@ module ActiveRecord
   end
 
   # Raised when the single-table inheritance mechanism fails to locate the subclass
-  # (for example due to improper usage of column that +inheritance_column+ points to).
-  class SubclassNotFound < ActiveRecordError #:nodoc:
+  # (for example due to improper usage of column that
+  # {ActiveRecord::Base.inheritance_column}[rdoc-ref:ModelSchema::ClassMethods#inheritance_column]
+  # points to).
+  class SubclassNotFound < ActiveRecordError
   end
 
   # Raised when an object assigned to an association has an incorrect type.
@@ -40,12 +42,13 @@ module ActiveRecord
   class AdapterNotFound < ActiveRecordError
   end
 
-  # Raised when connection to the database could not been established (for
-  # example when +connection=+ is given a nil object).
+  # Raised when connection to the database could not been established (for example when
+  # {ActiveRecord::Base.connection=}[rdoc-ref:ConnectionHandling#connection]
+  # is given a nil object).
   class ConnectionNotEstablished < ActiveRecordError
   end
 
-  # Raised when Active Record cannot find record by given id or set of ids.
+  # Raised when Active Record cannot find a record by given id or set of ids.
   class RecordNotFound < ActiveRecordError
     attr_reader :model, :primary_key, :id
 
@@ -58,8 +61,9 @@ module ActiveRecord
     end
   end
 
-  # Raised by ActiveRecord::Base.save! and ActiveRecord::Base.create! methods when record cannot be
-  # saved because record is invalid.
+  # Raised by {ActiveRecord::Base#save!}[rdoc-ref:Persistence#save!] and
+  # {ActiveRecord::Base.create!}[rdoc-ref:Persistence::ClassMethods#create!]
+  # methods when a record is invalid and can not be saved.
   class RecordNotSaved < ActiveRecordError
     attr_reader :record
 
@@ -69,7 +73,9 @@ module ActiveRecord
     end
   end
 
-  # Raised by ActiveRecord::Base.destroy! when a call to destroy would return false.
+  # Raised by {ActiveRecord::Base#destroy!}[rdoc-ref:Persistence#destroy!]
+  # when a call to {#destroy}[rdoc-ref:Persistence#destroy!]
+  # would return false.
   #
   #   begin
   #     complex_operation_that_internally_calls_destroy!
@@ -88,18 +94,26 @@ module ActiveRecord
 
   # Superclass for all database execution errors.
   #
-  # Wraps the underlying database error as +original_exception+.
+  # Wraps the underlying database error as +cause+.
   class StatementInvalid < ActiveRecordError
-    attr_reader :original_exception
 
     def initialize(message = nil, original_exception = nil)
-      @original_exception = original_exception
-      super(message)
+      if original_exception
+        ActiveSupport::Deprecation.warn("Passing #original_exception is deprecated and has no effect. " \
+                                        "Exceptions will automatically capture the original exception.", caller)
+      end
+
+      super(message || $!.try(:message))
+    end
+
+    def original_exception
+      ActiveSupport::Deprecation.warn("#original_exception is deprecated. Use #cause instead.", caller)
+      cause
     end
   end
 
   # Defunct wrapper class kept for compatibility.
-  # +StatementInvalid+ wraps the original exception now.
+  # StatementInvalid wraps the original exception now.
   class WrappedDatabaseException < StatementInvalid
   end
 
@@ -112,8 +126,8 @@ module ActiveRecord
   end
 
   # Raised when number of bind variables in statement given to +:condition+ key
-  # (for example, when using +find+ method) does not match number of expected
-  # values supplied.
+  # (for example, when using {ActiveRecord::Base.find}[rdoc-ref:FinderMethods#find] method)
+  # does not match number of expected values supplied.
   #
   # For example, when there are two placeholders with only one value supplied:
   #
@@ -147,7 +161,9 @@ module ActiveRecord
   end
 
   # Raised when association is being configured improperly or user tries to use
-  # offset and limit together with +has_many+ or +has_and_belongs_to_many+
+  # offset and limit together with
+  # {ActiveRecord::Base.has_many}[rdoc-ref:Associations::ClassMethods#has_many] or
+  # {ActiveRecord::Base.has_and_belongs_to_many}[rdoc-ref:Associations::ClassMethods#has_and_belongs_to_many]
   # associations.
   class ConfigurationError < ActiveRecordError
   end
@@ -156,9 +172,10 @@ module ActiveRecord
   class ReadOnlyRecord < ActiveRecordError
   end
 
-  # ActiveRecord::Transactions::ClassMethods.transaction uses this exception
-  # to distinguish a deliberate rollback from other exceptional situations.
-  # Normally, raising an exception will cause the +transaction+ method to rollback
+  # {ActiveRecord::Base.transaction}[rdoc-ref:Transactions::ClassMethods#transaction]
+  # uses this exception to distinguish a deliberate rollback from other exceptional situations.
+  # Normally, raising an exception will cause the
+  # {.transaction}[rdoc-ref:Transactions::ClassMethods#transaction] method to rollback
   # the database transaction *and* pass on the exception. But if you raise an
   # ActiveRecord::Rollback exception, then the database transaction will be rolled back,
   # without passing on the exception.
@@ -195,8 +212,8 @@ module ActiveRecord
   UnknownAttributeError = ActiveModel::UnknownAttributeError
 
   # Raised when an error occurred while doing a mass assignment to an attribute through the
-  # +attributes=+ method. The exception has an +attribute+ property that is the name of the
-  # offending attribute.
+  # {ActiveRecord::Base#attributes=}[rdoc-ref:AttributeAssignment#attributes=] method.
+  # The exception has an +attribute+ property that is the name of the offending attribute.
   class AttributeAssignmentError < ActiveRecordError
     attr_reader :exception, :attribute
 
@@ -207,7 +224,8 @@ module ActiveRecord
     end
   end
 
-  # Raised when there are multiple errors while doing a mass assignment through the +attributes+
+  # Raised when there are multiple errors while doing a mass assignment through the
+  # {ActiveRecord::Base#attributes=}[rdoc-ref:AttributeAssignment#attributes=]
   # method. The exception has an +errors+ property that contains an array of AttributeAssignmentError
   # objects, each corresponding to the error while assigning to an attribute.
   class MultiparameterAssignmentErrors < ActiveRecordError
@@ -254,7 +272,7 @@ module ActiveRecord
   # * You are joining an existing open transaction
   # * You are creating a nested (savepoint) transaction
   #
-  # The mysql, mysql2 and postgresql adapters support setting the transaction isolation level.
+  # The mysql2 and postgresql adapters support setting the transaction isolation level.
   class TransactionIsolationError < ActiveRecordError
   end
 end

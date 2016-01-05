@@ -43,9 +43,9 @@ module ActiveRecord
       # If you are having to call this function, you are likely doing something
       # wrong. The column does not have sufficient type information if the user
       # provided a custom type on the class level either explicitly (via
-      # `attribute`) or implicitly (via `serialize`,
-      # `time_zone_aware_attributes`). In almost all cases, the sql type should
-      # only be used to change quoting behavior, when the primitive to
+      # Attributes::ClassMethods#attribute) or implicitly (via
+      # AttributeMethods::Serialization::ClassMethods#serialize, +time_zone_aware_attributes+).
+      # In almost all cases, the sql type should only be used to change quoting behavior, when the primitive to
       # represent the type doesn't sufficiently reflect the differences
       # (varchar vs binary) for example. The type used to get this primitive
       # should have been provided before reaching the connection adapter.
@@ -58,7 +58,7 @@ module ActiveRecord
         end
       end
 
-      # See docs for +type_cast_from_column+
+      # See docs for #type_cast_from_column
       def lookup_cast_type_from_column(column) # :nodoc:
         lookup_cast_type(column.sql_type)
       end
@@ -93,7 +93,7 @@ module ActiveRecord
       # Override to return the quoted table name for assignment. Defaults to
       # table quoting.
       #
-      # This works for mysql and mysql2 where table.column can be used to
+      # This works for mysql2 where table.column can be used to
       # resolve ambiguity.
       #
       # We override this in the sqlite3 and postgresql adapters to use only

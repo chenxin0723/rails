@@ -3,7 +3,6 @@ require 'active_support/core_ext/hash/slice'
 require 'active_support/core_ext/enumerable'
 require 'active_support/core_ext/array/extract_options'
 require 'active_support/core_ext/regexp'
-require 'active_support/deprecation'
 require 'action_dispatch/routing/redirection'
 require 'action_dispatch/routing/endpoint'
 
@@ -12,7 +11,7 @@ module ActionDispatch
     class Mapper
       URL_OPTIONS = [:protocol, :subdomain, :domain, :host, :port]
 
-      class Constraints < Endpoint #:nodoc:
+      class Constraints < Routing::Endpoint #:nodoc:
         attr_reader :app, :constraints
 
         SERVE = ->(app, req) { app.serve req }
@@ -402,7 +401,8 @@ module ActionDispatch
         # because this means it will be matched first. As this is the most popular route
         # of most Rails applications, this is beneficial.
         def root(options = {})
-          match '/', { :as => :root, :via => :get }.merge!(options)
+          name = has_named_route?(:root) ? nil : :root
+          match '/', { as: name, via:  :get }.merge!(options)
         end
 
         # Matches a url pattern to one or more routes.
@@ -482,7 +482,7 @@ module ActionDispatch
         #      resources :user, param: :name
         #
         #   You can override <tt>ActiveRecord::Base#to_param</tt> of a related
-        #   model to construct an URL:
+        #   model to construct a URL:
         #
         #      class User < ActiveRecord::Base
         #        def to_param
@@ -600,17 +600,20 @@ module ActionDispatch
         def mount(app, options = nil)
           if options
             path = options.delete(:at)
-          else
-            unless Hash === app
-              raise ArgumentError, "must be called with mount point"
-            end
-
+          elsif Hash === app
             options = app
             app, path = options.find { |k, _| k.respond_to?(:call) }
             options.delete(app) if app
           end
 
-          raise "A rack application must be specified" unless path
+          raise ArgumentError, "A rack application must be specified" unless app.respond_to?(:call)
+          raise ArgumentError, <<-MSG.strip_heredoc unless path
+            Must be called with mount point
+
+              mount SomeRackApp, at: "some_route"
+              or
+              mount(SomeRackApp => "some_route")
+          MSG
 
           rails_app = rails_app? app
           options[:as] ||= app_name(app, rails_app)
@@ -665,6 +668,7 @@ module ActionDispatch
                   super(options)
                 else
                   prefix_options = options.slice(*_route.segment_keys)
+                  prefix_options[:relative_url_root] = ''.freeze
                   # we must actually delete prefix segment keys to avoid passing them to next url_for
                   _route.segment_keys.each { |k| options.delete(k) }
                   _routes.url_helpers.send("#{name}_path", prefix_options)
@@ -1866,7 +1870,7 @@ to this:
               # and return nil in case it isn't. Otherwise, we pass the invalid name
               # forward so the underlying router engine treats it and raises an exception.
               if as.nil?
-                candidate unless candidate !~ /\A[_a-z]/i || @set.named_routes.key?(candidate)
+                candidate unless candidate !~ /\A[_a-z]/i || has_named_route?(candidate)
               else
                 candidate
               end

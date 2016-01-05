@@ -62,7 +62,7 @@ module ActiveRecord
         aggregate_reflections[aggregation.to_s]
       end
 
-      # Returns a Hash of name of the reflection as the key and a AssociationReflection as the value.
+      # Returns a Hash of name of the reflection as the key and an AssociationReflection as the value.
       #
       #   Account.reflections # => {"balance" => AggregateReflection}
       #
@@ -172,6 +172,20 @@ module ActiveRecord
           end
         else
           options[:counter_cache] ? options[:counter_cache].to_s : "#{name}_count"
+        end
+      end
+
+      def inverse_of
+        return unless inverse_name
+
+        @inverse_of ||= klass._reflect_on_association inverse_name
+      end
+
+      def check_validity_of_inverse!
+        unless polymorphic?
+          if has_inverse? && inverse_of.nil?
+            raise InverseOfAssociationNotFoundError.new(self)
+          end
         end
       end
 
@@ -357,7 +371,7 @@ module ActiveRecord
       end
 
       def foreign_key
-        @foreign_key ||= options[:foreign_key] || derive_foreign_key
+        @foreign_key ||= options[:foreign_key] || derive_foreign_key.freeze
       end
 
       def association_foreign_key
@@ -375,14 +389,6 @@ module ActiveRecord
 
       def check_validity!
         check_validity_of_inverse!
-      end
-
-      def check_validity_of_inverse!
-        unless polymorphic?
-          if has_inverse? && inverse_of.nil?
-            raise InverseOfAssociationNotFoundError.new(self)
-          end
-        end
       end
 
       def check_preloadable!
@@ -434,12 +440,6 @@ module ActiveRecord
 
       def has_inverse?
         inverse_name
-      end
-
-      def inverse_of
-        return unless inverse_name
-
-        @inverse_of ||= klass._reflect_on_association inverse_name
       end
 
       def polymorphic_inverse_of(associated_class)
@@ -923,6 +923,8 @@ module ActiveRecord
         def primary_key(klass)
           klass.primary_key || raise(UnknownPrimaryKey.new(klass))
         end
+
+        def inverse_name; delegate_reflection.send(:inverse_name); end
 
       private
         def derive_class_name

@@ -32,6 +32,29 @@ module ActionDispatch # :nodoc:
   #    end
   #  end
   class Response
+    class Header < DelegateClass(Hash) # :nodoc:
+      def initialize(response, header)
+        @response = response
+        super(header)
+      end
+
+      def []=(k,v)
+        if @response.sending? || @response.sent?
+          raise ActionDispatch::IllegalStateError, 'header already sent'
+        end
+
+        super
+      end
+
+      def merge(other)
+        self.class.new @response, __getobj__.merge(other)
+      end
+
+      def to_hash
+        __getobj__.dup
+      end
+    end
+
     # The request that the response is responding to.
     attr_accessor :request
 
@@ -55,6 +78,10 @@ module ActionDispatch # :nodoc:
     cattr_accessor(:default_headers)
 
     include Rack::Response::Helpers
+    # Aliasing these off because AD::Http::Cache::Response defines them
+    alias :_cache_control :cache_control
+    alias :_cache_control= :cache_control=
+
     include ActionDispatch::Http::FilterRedirect
     include ActionDispatch::Http::Cache::Response
     include MonitorMixin
@@ -118,11 +145,10 @@ module ActionDispatch # :nodoc:
     def initialize(status = 200, header = {}, body = [])
       super()
 
-      @header = header
+      @header = Header.new(self, header)
 
       self.body, self.status = body, status
 
-      @blank        = false
       @cv           = new_cond
       @committed    = false
       @sending      = false
@@ -133,7 +159,7 @@ module ActionDispatch # :nodoc:
       yield self if block_given?
     end
 
-    def have_header?(key);  headers.key? key;   end
+    def has_header?(key);   headers.key? key;   end
     def get_header(key);    headers[key];       end
     def set_header(key, v); headers[key] = v;   end
     def delete_header(key); headers.delete key; end
@@ -256,12 +282,12 @@ module ActionDispatch # :nodoc:
       @stream.body
     end
 
-    EMPTY = " "
+    def write(string)
+      @stream.write string
+    end
 
     # Allows you to manually set or override the response body.
     def body=(body)
-      @blank = true if body == EMPTY
-
       if body.respond_to?(:to_path)
         @stream = body
       else
@@ -269,6 +295,40 @@ module ActionDispatch # :nodoc:
           @stream = build_buffer self, munge_body_object(body)
         end
       end
+    end
+
+    # Avoid having to pass an open file handle as the response body.
+    # Rack::Sendfile will usually intercept the response and uses
+    # the path directly, so there is no reason to open the file.
+    class FileBody #:nodoc:
+      attr_reader :to_path
+
+      def initialize(path)
+        @to_path = path
+      end
+
+      def body
+        File.binread(to_path)
+      end
+
+      # Stream the file's contents if Rack::Sendfile isn't present.
+      def each
+        File.open(to_path, 'rb') do |file|
+          while chunk = file.read(16384)
+            yield chunk
+          end
+        end
+      end
+    end
+
+    # Send the file stored at +path+ as the response body.
+    def send_file(path)
+      commit!
+      @stream = FileBody.new(path)
+    end
+
+    def reset_body!
+      @stream = build_buffer(self, [])
     end
 
     def body_parts
@@ -348,9 +408,12 @@ module ActionDispatch # :nodoc:
       return if committed?
       assign_default_content_type_and_charset!
       handle_conditional_get!
+      handle_no_content!
     end
 
     def before_sending
+      headers.freeze
+      request.commit_cookie_jar! unless committed?
     end
 
     def build_buffer(response, body)
@@ -365,7 +428,7 @@ module ActionDispatch # :nodoc:
       return if content_type
 
       ct = parse_content_type
-      set_content_type(ct.mime_type || Mime::Type[:HTML].to_s,
+      set_content_type(ct.mime_type || Mime[:html].to_s,
                        ct.charset || self.class.default_charset)
     end
 
@@ -405,10 +468,15 @@ module ActionDispatch # :nodoc:
       end
     end
 
+    def handle_no_content!
+      if NO_CONTENT_CODES.include?(@status)
+        @header.delete CONTENT_TYPE
+        @header.delete 'Content-Length'
+      end
+    end
+
     def rack_response(status, header)
       if NO_CONTENT_CODES.include?(status)
-        header.delete CONTENT_TYPE
-        header.delete 'Content-Length'
         [status, header, []]
       else
         [status, header, RackBody.new(self)]

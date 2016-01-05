@@ -203,9 +203,22 @@ class HasManyAssociationsTest < ActiveRecord::TestCase
 
     bulb = car.bulbs.create
     assert_equal 'defaulty', bulb.name
+  end
 
-    bulb = car.bulbs.create(:name => 'exotic')
+  def test_build_and_create_from_association_should_respect_passed_attributes_over_default_scope
+    car = Car.create(name: 'honda')
+
+    bulb = car.bulbs.build(name: 'exotic')
     assert_equal 'exotic', bulb.name
+
+    bulb = car.bulbs.create(name: 'exotic')
+    assert_equal 'exotic', bulb.name
+
+    bulb = car.awesome_bulbs.build(frickinawesome: false)
+    assert_equal false, bulb.frickinawesome
+
+    bulb = car.awesome_bulbs.create(frickinawesome: false)
+    assert_equal false, bulb.frickinawesome
   end
 
   def test_build_from_association_should_respect_scope
@@ -2181,6 +2194,26 @@ class HasManyAssociationsTest < ActiveRecord::TestCase
     assert_equal [bulb1, bulb2], car.all_bulbs.sort_by(&:id)
   end
 
+  test "can unscope and where the default scope of the associated model" do
+    Car.has_many :other_bulbs, -> { unscope(where: [:name]).where(name: 'other') }, class_name: "Bulb"
+    car = Car.create!
+    bulb1 = Bulb.create! name: "defaulty", car: car
+    bulb2 = Bulb.create! name: "other",    car: car
+
+    assert_equal [bulb1], car.bulbs
+    assert_equal [bulb2], car.other_bulbs
+  end
+
+  test "can rewhere the default scope of the associated model" do
+    Car.has_many :old_bulbs, -> { rewhere(name: 'old') }, class_name: "Bulb"
+    car = Car.create!
+    bulb1 = Bulb.create! name: "defaulty", car: car
+    bulb2 = Bulb.create! name: "old",      car: car
+
+    assert_equal [bulb1], car.bulbs
+    assert_equal [bulb2], car.old_bulbs
+  end
+
   test 'unscopes the default scope of associated model when used with include' do
     car = Car.create!
     bulb = Bulb.create! name: "other", car: car
@@ -2313,6 +2346,12 @@ class HasManyAssociationsTest < ActiveRecord::TestCase
     car.bulbs = [second_bulb, same_bulb]
 
     assert_equal [first_bulb, second_bulb], car.bulbs
+  end
+
+  test 'double insertion of new object to association when same association used in the after create callback of a new object' do
+    car = Car.create!
+    car.bulbs << TrickyBulb.new
+    assert_equal 1, car.bulbs.size
   end
 
   def test_association_force_reload_with_only_true_is_deprecated

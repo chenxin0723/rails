@@ -1,17 +1,79 @@
+*   Fix `collection_radio_buttons` hidden_field name and make it appear
+    before the actual input radio tags to make the real value override
+    the hidden when passed.
+
+    Fixes #22773
+
+    *Santiago Pastorino*
+
+*   `ActionView::TestCase::Controller#params` returns an instance of
+    `ActionController::Parameters`.
+
+    *Justin Coyne*
+
+*   Fix regression in `submit_tag` when a symbol is used as label argument.
+
+    *Yuuji Yaginuma*
+
+
+## Rails 5.0.0.beta1 (December 18, 2015) ##
+
+*   `I18n.translate` helper will wrap the missing translation keys
+     in a <span> tag only if `debug_missing_translation` configuration
+     be true. Default value is `true`. For example in `application.rb`:
+
+       # in order to turn off missing key wrapping
+       config.action_view.debug_missing_translation = false
+
+     *Sameer Rahmani*
+
+*   Respect value of `:object` if `:object` is false when rendering.
+
+    Fixes #22260.
+
+    *Yuichiro Kaneko*
+
+*   Generate `week_field` input values using a 1-based index and not a 0-based index
+    as per the W3 spec: http://www.w3.org/TR/html-markup/datatypes.html#form.data.week
+
+    *Christoph Geschwind*
+
+*   Allow `host` option in `javascript_include_tag` and `stylesheet_link_tag` helpers
+
+    *Grzegorz Witek*
+
+*   Restrict `url_for :back` to valid, non-JavaScript URLs. GH#14444
+
+    *Damien Burke*
+
+*   Allow `date_select` helper selected option to accept hash like the default options.
+
+    *Lecky Lao*
+
+*   Collection input propagates input's `id` to the label's `for` attribute when
+    using html options as the last element of collection.
+
+    *Vasiliy Ermolovich*
+
+*   Add a `hidden_field` on the `collection_radio_buttons` to avoid raising a error
+    when the only input on the form is the `collection_radio_buttons`.
+
+    *Mauro George*
+
 *   `url_for` does not modify its arguments when generating polymorphic URLs.
 
     *Bernerd Schaefer*
 
-*   `number_to_currency` and `number_with_delimiter` now accept custom `delimiter_pattern` option 
-     to handle placement of delimiter, to support currency formats like INR 
-     
-     Example: 
-        
+*   `number_to_currency` and `number_with_delimiter` now accept a custom `delimiter_pattern` option
+    to handle placement of delimiter, to support currency formats like INR.
+
+    Example:
+
         number_to_currency(1230000, delimiter_pattern: /(\d+?)(?=(\d\d)+(\d)(?!\d))/, unit: '₹', format: "%u %n")
-        # => '₹ 12,30,000.00' 
-        
+        # => '₹ 12,30,000.00'
+
     *Vipul A M*
-    
+
 *   Make `disable_with` the default behavior for submit tags. Disables the
     button on submit to prevent double submits.
 
@@ -19,7 +81,7 @@
 
 *   Add a break_sequence option to word_wrap so you can specify a custom break.
 
-    * Mauricio Gomez *
+    *Mauricio Gomez*
 
 *   Add wildcard matching to explicit dependencies.
 
@@ -53,7 +115,7 @@
     Which could happen if the rendering was done directly in the controller
     and not in a template.
 
-    Fixes #20535
+    Fixes #20535.
 
     *Roque Pinel*
 
@@ -62,7 +124,7 @@
 
     *Dov Murik*
 
-*   Raise an ArgumentError when a false value for `include_blank` is passed to a
+*   Raise an `ArgumentError` when a false value for `include_blank` is passed to a
     required select field (to comply with the HTML5 spec).
 
     *Grey Baker*
@@ -80,7 +142,7 @@
 *   `translate` should handle `raise` flag correctly in case of both main and default
     translation is missing.
 
-    Fixes #19967
+    Fixes #19967.
 
     *Bernard Potocki*
 
@@ -102,7 +164,7 @@
 *   `translate` should accept nils as members of the `:default`
     parameter without raising a translation missing error.
 
-    Fixes #19419
+    Fixes #19419.
 
     *Justin Coyne*
 
@@ -184,7 +246,7 @@
 
     *Nikolay Shebanov*
 
-*   Add a `hidden_field` on the `file_field` to avoid raise a error when the only
+*   Add a `hidden_field` on the `file_field` to avoid raising an error when the only
     input on the form is the `file_field`.
 
     *Mauro George*

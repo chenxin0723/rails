@@ -1,5 +1,3 @@
-require "active_support/deprecation"
-
 module ActiveRecord
   module Associations
     # = Active Record Association Collection
@@ -416,12 +414,16 @@ module ActiveRecord
 
       def replace_on_target(record, index, skip_callbacks)
         callback(:before_add, record) unless skip_callbacks
+
+        was_loaded = loaded?
         yield(record) if block_given?
 
-        if index
-          @target[index] = record
-        else
-          @target << record
+        unless !was_loaded && loaded?
+          if index
+            @target[index] = record
+          else
+            @target << record
+          end
         end
 
         callback(:after_add, record) unless skip_callbacks

@@ -19,6 +19,8 @@ require 'models/person'
 require 'models/pet'
 require 'models/ship'
 require 'models/toy'
+require 'models/admin'
+require 'models/admin/user'
 require 'rexml/document'
 
 class PersistenceTest < ActiveRecord::TestCase
@@ -120,6 +122,15 @@ class PersistenceTest < ActiveRecord::TestCase
     assert_equal 59, accounts(:signals37, :reload).credit_limit
   end
 
+  def test_increment_updates_counter_in_db_using_offset
+    a1 = accounts(:signals37)
+    initial_credit = a1.credit_limit
+    a2 = Account.find(accounts(:signals37).id)
+    a1.increment!(:credit_limit)
+    a2.increment!(:credit_limit)
+    assert_equal initial_credit + 2, a1.reload.credit_limit
+  end
+
   def test_destroy_all
     conditions = "author_name = 'Mary'"
     topics_by_mary = Topic.all.merge!(:where => conditions, :order => 'id').to_a
@@ -152,7 +163,24 @@ class PersistenceTest < ActiveRecord::TestCase
     assert !company.valid?
     original_errors = company.errors
     client = company.becomes(Client)
-    assert_equal original_errors, client.errors
+    assert_equal original_errors.keys, client.errors.keys
+  end
+
+  def test_becomes_errors_base
+    child_class = Class.new(Admin::User) do
+      store_accessor :settings, :foo
+
+      def self.name; 'Admin::ChildUser'; end
+    end
+
+    admin = Admin::User.new
+    admin.errors.add :token, :invalid
+    child = admin.becomes(child_class)
+
+    assert_equal [:token], child.errors.keys
+    assert_nothing_raised do
+      child.errors.add :foo, :invalid
+    end
   end
 
   def test_dupd_becomes_persists_changes_from_the_original
@@ -735,9 +763,10 @@ class PersistenceTest < ActiveRecord::TestCase
     assert !topic.approved?
     assert_equal "The First Topic", topic.title
 
-    assert_raise(ActiveRecord::RecordNotUnique, ActiveRecord::StatementInvalid) do
+    error = assert_raise(ActiveRecord::RecordNotUnique, ActiveRecord::StatementInvalid) do
       topic.update_attributes(id: 3, title: "Hm is it possible?")
     end
+    assert_not_nil error.cause
     assert_not_equal "Hm is it possible?", Topic.find(3).title
 
     topic.update_attributes(id: 1234)
@@ -955,5 +984,18 @@ class PersistenceTest < ActiveRecord::TestCase
       ActiveRecord::Base.connection.drop_table widget.table_name
       widget.reset_column_information
     end
+  end
+
+  def test_reset_column_information_resets_children
+    child = Class.new(Topic)
+    child.new # force schema to load
+
+    ActiveRecord::Base.connection.add_column(:topics, :foo, :string)
+    Topic.reset_column_information
+
+    assert_equal "bar", child.new(foo: :bar).foo
+  ensure
+    ActiveRecord::Base.connection.remove_column(:topics, :foo)
+    Topic.reset_column_information
   end
 end

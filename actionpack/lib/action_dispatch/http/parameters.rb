@@ -4,7 +4,7 @@ module ActionDispatch
       PARAMETERS_KEY = 'action_dispatch.request.path_parameters'
 
       DEFAULT_PARSERS = {
-        Mime::Type[:JSON] => lambda { |raw_post|
+        Mime[:json] => lambda { |raw_post|
           data = ActiveSupport::JSON.decode(raw_post)
           data.is_a?(Hash) ? data : {:_json => data}
         }
@@ -43,7 +43,7 @@ module ActionDispatch
       #
       #   {'action' => 'my_action', 'controller' => 'my_controller'}
       def path_parameters
-        get_header(PARAMETERS_KEY) || {}
+        get_header(PARAMETERS_KEY) || set_header(PARAMETERS_KEY, {})
       end
 
       private
@@ -55,11 +55,11 @@ module ActionDispatch
 
         begin
           strategy.call(raw_post)
-        rescue => e # JSON or Ruby code block errors
+        rescue # JSON or Ruby code block errors
           my_logger = logger || ActiveSupport::Logger.new($stderr)
           my_logger.debug "Error occurred while parsing request parameters.\nContents:\n\n#{raw_post}"
 
-          raise ParamsParser::ParseError.new(e.message, e)
+          raise ParamsParser::ParseError
         end
       end
 
